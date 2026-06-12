@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/hooks/use-auth";
 import { AppLayout } from "@/components/layout";
 
 import NotFound from "@/pages/not-found";
@@ -16,11 +16,15 @@ import Login from "@/pages/login";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ component: Component }: { component: any }) {
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center text-primary font-mono">LOADING_SESSION...</div>;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-primary font-mono text-sm">
+        LOADING_SESSION...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {

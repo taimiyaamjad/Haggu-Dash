@@ -9,7 +9,6 @@ import * as zod from 'zod';
 
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -20,84 +19,68 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get the currently authenticated user
  */
-export const GetCurrentAuthUserHeader = zod.object({
-  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
-})
-
 export const GetCurrentAuthUserResponse = zod.object({
   "user": zod.union([zod.object({
   "id": zod.string(),
-  "email": zod.string().email().nullable(),
-  "firstName": zod.string().nullable(),
-  "lastName": zod.string().nullable(),
-  "profileImageUrl": zod.string().nullable()
+  "email": zod.string(),
+  "username": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "role": zod.string(),
+  "profileImageUrl": zod.string().nullish()
 }),zod.null()])
 })
 
 
 /**
- * @summary Start the browser OIDC login flow
+ * @summary Login with email and password
  */
-export const BeginBrowserLoginQueryParams = zod.object({
-  "returnTo": zod.coerce.string().optional()
+export const LoginWithPasswordBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const LoginWithPasswordResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "username": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "role": zod.string(),
+  "profileImageUrl": zod.string().nullish()
 })
 
 
 /**
- * @summary Complete the browser OIDC login flow
+ * @summary Create a new account (also creates Pterodactyl user if configured)
  */
-export const HandleBrowserLoginCallbackQueryParams = zod.object({
-  "code": zod.coerce.string().optional(),
-  "state": zod.coerce.string().optional(),
-  "iss": zod.coerce.string().url().optional()
+export const registerAccountBodyUsernameMin = 3;
+
+export const registerAccountBodyPasswordMin = 6;
+
+
+
+
+
+export const RegisterAccountBody = zod.object({
+  "email": zod.string().email(),
+  "username": zod.string().min(registerAccountBodyUsernameMin),
+  "password": zod.string().min(registerAccountBodyPasswordMin),
+  "firstName": zod.string().min(1),
+  "lastName": zod.string().min(1)
 })
 
 
 /**
- * @summary Clear the session and begin OIDC logout
+ * @summary Clear session and log out
  */
-export const LogoutBrowserSessionHeader = zod.object({
-  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
-})
-
-
-/**
- * @summary Exchange a mobile OIDC code for a session token
- */
-
-
-
-
-
-
-
-export const ExchangeMobileAuthorizationCodeBody = zod.object({
-  "code": zod.string().min(1),
-  "code_verifier": zod.string().min(1),
-  "redirect_uri": zod.string().url().min(1),
-  "state": zod.string().min(1),
-  "nonce": zod.string().min(1).optional()
-})
-
-export const ExchangeMobileAuthorizationCodeResponse = zod.object({
-  "token": zod.string()
-})
-
-
-/**
- * @summary Delete a mobile session token
- */
-export const LogoutMobileSessionHeader = zod.object({
-  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
-})
-
-export const LogoutMobileSessionResponse = zod.object({
+export const LogoutSessionResponse = zod.object({
   "success": zod.boolean()
 })
 
 
 /**
- * @summary Get application settings (panel URL, API key masked)
+ * @summary Get application settings
  */
 export const GetSettingsResponse = zod.object({
   "panelUrl": zod.string().nullable(),
@@ -107,7 +90,7 @@ export const GetSettingsResponse = zod.object({
 
 
 /**
- * @summary Update application settings (Pterodactyl panel URL and API key)
+ * @summary Update Pterodactyl panel URL and API key
  */
 export const UpdateSettingsBody = zod.object({
   "panelUrl": zod.string().optional(),
@@ -132,7 +115,7 @@ export const TestPterodactylConnectionResponse = zod.object({
 
 
 /**
- * @summary Get dashboard summary stats (server counts by status, resource totals)
+ * @summary Get dashboard summary stats
  */
 export const GetDashboardSummaryResponse = zod.object({
   "totalServers": zod.number(),
@@ -257,7 +240,7 @@ export const GetServerResponse = zod.object({
 
 
 /**
- * @summary Send a power action to a server (start, stop, restart, kill)
+ * @summary Send a power action (start, stop, restart, kill)
  */
 export const SendServerPowerActionParams = zod.object({
   "serverId": zod.coerce.string()
@@ -440,7 +423,7 @@ export const DeletePterodactylUserParams = zod.object({
 
 
 /**
- * @summary Log an activity entry (internal)
+ * @summary Log an activity entry
  */
 export const CreateActivityEntryBody = zod.object({
   "action": zod.string(),

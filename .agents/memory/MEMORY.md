@@ -1,2 +1,3 @@
 - [ZenDash settings storage](zendash-settings.md) — Pterodactyl URL+key stored in app_settings DB table, not env vars; update via UI without restart.
 - [ZenDash Pterodactyl client split](zendash-ptero-client.md) — two request helpers: pteroRequest (application API) and pteroClientRequest (client API for power/commands); different base paths.
+- [ZenDash auth system](zendash-auth.md) — email/password auth; bootstrap admin/admin123 when Pterodactyl not configured; registration mirrors to Pterodactyl; no Replit Auth.

@@ -7,7 +7,7 @@ import { getPteroConfig } from "../lib/pterodactyl";
 
 const router = Router();
 
-async function getSetting(key: string): Promise<string | null> {
+export async function getSetting(key: string): Promise<string | null> {
   const rows = await db
     .select()
     .from(appSettingsTable)

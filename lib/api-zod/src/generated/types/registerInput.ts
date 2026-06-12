@@ -6,13 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AuthUser {
-  id: string;
+export interface RegisterInput {
   email: string;
+  /** @minLength 3 */
   username: string;
+  /** @minLength 6 */
+  password: string;
+  /** @minLength 1 */
   firstName: string;
+  /** @minLength 1 */
   lastName: string;
-  role: string;
-  /** @nullable */
-  profileImageUrl?: string | null;
 }

@@ -11,35 +11,34 @@ export interface HealthStatus {
 
 export interface AuthUser {
   id: string;
+  email: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  role: string;
   /** @nullable */
-  email: string | null;
-  /** @nullable */
-  firstName: string | null;
-  /** @nullable */
-  lastName: string | null;
-  /** @nullable */
-  profileImageUrl: string | null;
+  profileImageUrl?: string | null;
 }
 
 export interface AuthUserEnvelope {
   user: AuthUser | null;
 }
 
-export interface MobileTokenExchangeRequest {
-  /** @minLength 1 */
-  code: string;
-  /** @minLength 1 */
-  code_verifier: string;
-  /** @minLength 1 */
-  redirect_uri: string;
-  /** @minLength 1 */
-  state: string;
-  /** @minLength 1 */
-  nonce?: string;
+export interface LoginInput {
+  email: string;
+  password: string;
 }
 
-export interface MobileTokenExchangeSuccess {
-  token: string;
+export interface RegisterInput {
+  email: string;
+  /** @minLength 3 */
+  username: string;
+  /** @minLength 6 */
+  password: string;
+  /** @minLength 1 */
+  firstName: string;
+  /** @minLength 1 */
+  lastName: string;
 }
 
 export const LogoutSuccessValue = {
@@ -103,17 +102,6 @@ export interface ActivityInput {
   serverName?: string;
   userId?: string;
   userName?: string;
-}
-
-export interface ServerAllocation {
-  id: number;
-  ip: string;
-  port: number;
-  /** @nullable */
-  alias: string | null;
-  /** @nullable */
-  notes: string | null;
-  assigned: boolean;
 }
 
 export interface ServerLimits {
@@ -267,21 +255,6 @@ export interface PteroUserUpdate {
   password?: string;
   rootAdmin?: boolean;
 }
-
-/**
- * Opaque session token — Bearer <sid>.
- */
-export type AuthorizationSessionHeaderParameter = string;
-
-export type BeginBrowserLoginParams = {
-returnTo?: string;
-};
-
-export type HandleBrowserLoginCallbackParams = {
-code?: string;
-state?: string;
-iss?: string;
-};
 
 export type ListServersParams = {
 page?: number;

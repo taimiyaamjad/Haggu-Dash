@@ -10,7 +10,7 @@ tags:
   - name: health
     description: Health operations
   - name: Auth
-    description: Browser and mobile authentication endpoints.
+    description: Authentication endpoints.
   - name: settings
     description: Application settings
   - name: servers
@@ -28,7 +28,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -37,14 +36,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  # ─── Auth ────────────────────────────────────────────────────────────────────
+
   /auth/user:
     get:
       tags: [Auth]
       operationId: getCurrentAuthUser
       summary: Get the currently authenticated user
-      parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-        - $ref: '#/components/parameters/SessionCookie'
       responses:
         '200':
           description: Auth status resolved successfully.
@@ -53,106 +51,76 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthUserEnvelope'
 
-  /login:
-    get:
-      tags: [Auth]
-      operationId: beginBrowserLogin
-      summary: Start the browser OIDC login flow
-      parameters:
-        - name: returnTo
-          in: query
-          required: false
-          schema:
-            type: string
-      responses:
-        '302':
-          description: Redirect to the OIDC authorization endpoint.
-
-  /callback:
-    get:
-      tags: [Auth]
-      operationId: handleBrowserLoginCallback
-      summary: Complete the browser OIDC login flow
-      parameters:
-        - name: code
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: state
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: iss
-          in: query
-          required: false
-          schema:
-            type: string
-            format: uri
-      responses:
-        '302':
-          description: Redirect to the returnTo path on success or /api/login on failure.
-
-  /logout:
-    get:
-      tags: [Auth]
-      operationId: logoutBrowserSession
-      summary: Clear the session and begin OIDC logout
-      parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-        - $ref: '#/components/parameters/SessionCookie'
-      responses:
-        '302':
-          description: Redirect to the OIDC provider logout URL.
-
-  /mobile-auth/token-exchange:
+  /auth/login:
     post:
       tags: [Auth]
-      operationId: exchangeMobileAuthorizationCode
-      summary: Exchange a mobile OIDC code for a session token
+      operationId: loginWithPassword
+      summary: Login with email and password
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+              $ref: '#/components/schemas/LoginInput'
       responses:
         '200':
-          description: Session created successfully.
+          description: Login successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
-        '400':
-          description: Missing or invalid required fields.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/AuthUser'
         '401':
-          description: Token did not contain usable claims.
+          description: Invalid credentials
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Token exchange failed.
+        '400':
+          description: Missing fields
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 
-  /mobile-auth/logout:
+  /auth/register:
     post:
       tags: [Auth]
-      operationId: logoutMobileSession
-      summary: Delete a mobile session token
-      parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      operationId: registerAccount
+      summary: Create a new account (also creates Pterodactyl user if configured)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '400':
+          description: Validation error or email already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Pterodactyl not configured (required for registration)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutSession
+      summary: Clear session and log out
       responses:
         '200':
-          description: Logout processed.
+          description: Logged out successfully
           content:
             application/json:
               schema:
@@ -164,7 +132,7 @@ paths:
     get:
       operationId: getSettings
       tags: [settings]
-      summary: Get application settings (panel URL, API key masked)
+      summary: Get application settings
       responses:
         "200":
           description: Settings
@@ -175,7 +143,7 @@ paths:
     patch:
       operationId: updateSettings
       tags: [settings]
-      summary: Update application settings (Pterodactyl panel URL and API key)
+      summary: Update Pterodactyl panel URL and API key
       requestBody:
         required: true
         content:
@@ -221,7 +189,7 @@ paths:
     get:
       operationId: getDashboardSummary
       tags: [dashboard]
-      summary: Get dashboard summary stats (server counts by status, resource totals)
+      summary: Get dashboard summary stats
       responses:
         "200":
           description: Dashboard summary
@@ -307,7 +275,7 @@ paths:
     post:
       operationId: sendServerPowerAction
       tags: [servers]
-      summary: Send a power action to a server (start, stop, restart, kill)
+      summary: Send a power action (start, stop, restart, kill)
       parameters:
         - name: serverId
           in: path
@@ -411,7 +379,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
-  # ─── Users ───────────────────────────────────────────────────────────────────
+  # ─── Pterodactyl Users ────────────────────────────────────────────────────────
 
   /users:
     get:
@@ -540,13 +508,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
-  # ─── Activity Log ─────────────────────────────────────────────────────────────
+  # ─── Activity ─────────────────────────────────────────────────────────────────
 
   /activity:
     post:
       operationId: createActivityEntry
       tags: [dashboard]
-      summary: Log an activity entry (internal)
+      summary: Log an activity entry
       requestBody:
         required: true
         content:
@@ -562,22 +530,6 @@ paths:
                 $ref: "#/components/schemas/ActivityEntry"
 
 components:
-  parameters:
-    AuthorizationSessionHeader:
-      name: Authorization
-      in: header
-      required: false
-      description: Opaque session token — Bearer <sid>.
-      schema:
-        type: string
-    SessionCookie:
-      name: sid
-      in: cookie
-      required: false
-      description: Browser session cookie.
-      schema:
-        type: string
-
   schemas:
     HealthStatus:
       type: object
@@ -591,19 +543,23 @@ components:
 
     AuthUser:
       type: object
-      required: [id, email, firstName, lastName, profileImageUrl]
+      required: [id, email, username, firstName, lastName, role]
       properties:
         id:
           type: string
         email:
-          type: [string, 'null']
-          format: email
+          type: string
+        username:
+          type: string
         firstName:
-          type: [string, 'null']
+          type: string
         lastName:
-          type: [string, 'null']
+          type: string
+        role:
+          type: string
         profileImageUrl:
-          type: [string, 'null']
+          type: ["string", "null"]
+
     AuthUserEnvelope:
       type: object
       required: [user]
@@ -612,32 +568,36 @@ components:
           oneOf:
             - $ref: '#/components/schemas/AuthUser'
             - type: 'null'
-    MobileTokenExchangeRequest:
+
+    LoginInput:
       type: object
-      required: [code, code_verifier, redirect_uri, state]
+      required: [email, password]
       properties:
-        code:
+        email:
           type: string
-          minLength: 1
-        code_verifier:
+        password:
           type: string
-          minLength: 1
-        redirect_uri:
-          type: string
-          minLength: 1
-          format: uri
-        state:
-          type: string
-          minLength: 1
-        nonce:
-          type: string
-          minLength: 1
-    MobileTokenExchangeSuccess:
+
+    RegisterInput:
       type: object
-      required: [token]
+      required: [email, username, password, firstName, lastName]
       properties:
-        token:
+        email:
           type: string
+          format: email
+        username:
+          type: string
+          minLength: 3
+        password:
+          type: string
+          minLength: 6
+        firstName:
+          type: string
+          minLength: 1
+        lastName:
+          type: string
+          minLength: 1
+
     LogoutSuccess:
       type: object
       required: [success]
@@ -645,6 +605,7 @@ components:
         success:
           type: boolean
           const: true
+
     ErrorEnvelope:
       type: object
       required: [error]
@@ -747,23 +708,6 @@ components:
           type: string
 
     # ─── Servers ──────────────────────────────────────────────────────────────
-
-    ServerAllocation:
-      type: object
-      required: [id, ip, port, alias, notes, assigned]
-      properties:
-        id:
-          type: integer
-        ip:
-          type: string
-        port:
-          type: integer
-        alias:
-          type: ["string", "null"]
-        notes:
-          type: ["string", "null"]
-        assigned:
-          type: boolean
 
     Server:
       type: object
@@ -944,7 +888,7 @@ components:
           type: string
           format: date-time
 
-    # ─── Users ────────────────────────────────────────────────────────────────
+    # ─── Pterodactyl Users ────────────────────────────────────────────────────
 
     PteroUser:
       type: object
@@ -1022,8 +966,6 @@ components:
           type: string
         rootAdmin:
           type: boolean
-
-    # ─── Shared ───────────────────────────────────────────────────────────────
 
     PaginationMeta:
       type: object
