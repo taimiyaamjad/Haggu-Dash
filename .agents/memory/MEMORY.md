@@ -1,0 +1,2 @@
+- [ZenDash settings storage](zendash-settings.md) — Pterodactyl URL+key stored in app_settings DB table, not env vars; update via UI without restart.
+- [ZenDash Pterodactyl client split](zendash-ptero-client.md) — two request helpers: pteroRequest (application API) and pteroClientRequest (client API for power/commands); different base paths.

@@ -1,15 +1,27 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ZenDash API — Pterodactyl server management dashboard
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
+  - name: settings
+    description: Application settings
+  - name: servers
+    description: Pterodactyl server management
+  - name: nodes
+    description: Pterodactyl node info
+  - name: users
+    description: Admin user management
+  - name: dashboard
+    description: Dashboard aggregates and stats
+
 paths:
   /healthz:
     get:
@@ -24,7 +36,548 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect to the returnTo path on success or /api/login on failure.
+
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Token did not contain usable claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Token exchange failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
+  # ─── Settings ────────────────────────────────────────────────────────────────
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get application settings (panel URL, API key masked)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update application settings (Pterodactyl panel URL and API key)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /settings/test:
+    post:
+      operationId: testPterodactylConnection
+      tags: [settings]
+      summary: Test the Pterodactyl API connection
+      responses:
+        "200":
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResult"
+        "400":
+          description: Settings not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  # ─── Dashboard ───────────────────────────────────────────────────────────────
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats (server counts by status, resource totals)
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/activity:
+    get:
+      operationId: getDashboardActivity
+      tags: [dashboard]
+      summary: Get recent activity log
+      responses:
+        "200":
+          description: Activity log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEntry"
+
+  # ─── Servers ─────────────────────────────────────────────────────────────────
+
+  /servers:
+    get:
+      operationId: listServers
+      tags: [servers]
+      summary: List all servers from Pterodactyl
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated list of servers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerList"
+        "503":
+          description: Pterodactyl not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /servers/{serverId}:
+    get:
+      operationId: getServer
+      tags: [servers]
+      summary: Get a single server
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Server detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /servers/{serverId}/power:
+    post:
+      operationId: sendServerPowerAction
+      tags: [servers]
+      summary: Send a power action to a server (start, stop, restart, kill)
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PowerActionInput"
+      responses:
+        "204":
+          description: Power action sent
+        "400":
+          description: Invalid action
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /servers/{serverId}/resources:
+    get:
+      operationId: getServerResources
+      tags: [servers]
+      summary: Get real-time resource usage for a server
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resource usage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResources"
+        "404":
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /servers/{serverId}/command:
+    post:
+      operationId: sendServerCommand
+      tags: [servers]
+      summary: Send a console command to a server
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandInput"
+      responses:
+        "204":
+          description: Command sent
+        "404":
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  # ─── Nodes ───────────────────────────────────────────────────────────────────
+
+  /nodes:
+    get:
+      operationId: listNodes
+      tags: [nodes]
+      summary: List all nodes
+      responses:
+        "200":
+          description: List of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Node"
+        "503":
+          description: Pterodactyl not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  # ─── Users ───────────────────────────────────────────────────────────────────
+
+  /users:
+    get:
+      operationId: listPterodactylUsers
+      tags: [users]
+      summary: List all users from Pterodactyl
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PteroUserList"
+        "503":
+          description: Pterodactyl not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      operationId: createPterodactylUser
+      tags: [users]
+      summary: Create a new Pterodactyl user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PteroUserInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PteroUser"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /users/{userId}:
+    get:
+      operationId: getPterodactylUser
+      tags: [users]
+      summary: Get a Pterodactyl user by ID
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PteroUser"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      operationId: updatePterodactylUser
+      tags: [users]
+      summary: Update a Pterodactyl user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PteroUserUpdate"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PteroUser"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      operationId: deletePterodactylUser
+      tags: [users]
+      summary: Delete a Pterodactyl user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: User deleted
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  # ─── Activity Log ─────────────────────────────────────────────────────────────
+
+  /activity:
+    post:
+      operationId: createActivityEntry
+      tags: [dashboard]
+      summary: Log an activity entry (internal)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityInput"
+      responses:
+        "201":
+          description: Activity logged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityEntry"
+
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — Bearer <sid>.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +587,455 @@ components:
       required:
         - status
 
+    # ─── Auth ─────────────────────────────────────────────────────────────────
+
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    # ─── Settings ─────────────────────────────────────────────────────────────
+
+    Settings:
+      type: object
+      required: [panelUrl, hasApiKey, configured]
+      properties:
+        panelUrl:
+          type: ["string", "null"]
+        hasApiKey:
+          type: boolean
+        configured:
+          type: boolean
+
+    SettingsInput:
+      type: object
+      properties:
+        panelUrl:
+          type: string
+        apiKey:
+          type: string
+
+    ConnectionTestResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        version:
+          type: ["string", "null"]
+
+    # ─── Dashboard ────────────────────────────────────────────────────────────
+
+    DashboardSummary:
+      type: object
+      required: [totalServers, runningServers, stoppedServers, totalNodes, totalUsers, totalAllocations]
+      properties:
+        totalServers:
+          type: integer
+        runningServers:
+          type: integer
+        stoppedServers:
+          type: integer
+        offlineServers:
+          type: integer
+        totalNodes:
+          type: integer
+        totalUsers:
+          type: integer
+        totalAllocations:
+          type: integer
+        configured:
+          type: boolean
+
+    ActivityEntry:
+      type: object
+      required: [id, action, description, createdAt]
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        description:
+          type: string
+        serverId:
+          type: ["string", "null"]
+        serverName:
+          type: ["string", "null"]
+        userId:
+          type: ["string", "null"]
+        userName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    ActivityInput:
+      type: object
+      required: [action, description]
+      properties:
+        action:
+          type: string
+        description:
+          type: string
+        serverId:
+          type: string
+        serverName:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+
+    # ─── Servers ──────────────────────────────────────────────────────────────
+
+    ServerAllocation:
+      type: object
+      required: [id, ip, port, alias, notes, assigned]
+      properties:
+        id:
+          type: integer
+        ip:
+          type: string
+        port:
+          type: integer
+        alias:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        assigned:
+          type: boolean
+
+    Server:
+      type: object
+      required: [id, externalId, uuid, identifier, name, description, suspended, limits, featureLimits, node, container, updatedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        externalId:
+          type: ["string", "null"]
+        uuid:
+          type: string
+        identifier:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        suspended:
+          type: boolean
+        limits:
+          $ref: "#/components/schemas/ServerLimits"
+        featureLimits:
+          $ref: "#/components/schemas/FeatureLimits"
+        node:
+          type: string
+        container:
+          $ref: "#/components/schemas/ServerContainer"
+        updatedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: ["string", "null"]
+
+    ServerLimits:
+      type: object
+      required: [memory, swap, disk, io, cpu]
+      properties:
+        memory:
+          type: integer
+        swap:
+          type: integer
+        disk:
+          type: integer
+        io:
+          type: integer
+        cpu:
+          type: integer
+        threads:
+          type: ["string", "null"]
+
+    FeatureLimits:
+      type: object
+      required: [databases, allocations, backups]
+      properties:
+        databases:
+          type: integer
+        allocations:
+          type: integer
+        backups:
+          type: integer
+
+    ServerContainer:
+      type: object
+      required: [startupCommand, image, installed, environment]
+      properties:
+        startupCommand:
+          type: string
+        image:
+          type: string
+        installed:
+          type: boolean
+        environment:
+          type: object
+          additionalProperties:
+            type: string
+
+    ServerList:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Server"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    ServerResources:
+      type: object
+      required: [currentState, isSuspended, resources]
+      properties:
+        currentState:
+          type: string
+        isSuspended:
+          type: boolean
+        resources:
+          $ref: "#/components/schemas/ResourceUsage"
+
+    ResourceUsage:
+      type: object
+      required: [memoryBytes, cpuAbsolute, diskBytes, networkRxBytes, networkTxBytes, uptime]
+      properties:
+        memoryBytes:
+          type: integer
+        cpuAbsolute:
+          type: number
+        diskBytes:
+          type: integer
+        networkRxBytes:
+          type: integer
+        networkTxBytes:
+          type: integer
+        uptime:
+          type: integer
+
+    PowerActionInput:
+      type: object
+      required: [signal]
+      properties:
+        signal:
+          type: string
+          enum: [start, stop, restart, kill]
+
+    CommandInput:
+      type: object
+      required: [command]
+      properties:
+        command:
+          type: string
+
+    # ─── Nodes ────────────────────────────────────────────────────────────────
+
+    Node:
+      type: object
+      required: [id, uuid, name, description, locationId, fqdn, scheme, behindProxy, maintenanceMode, memory, memoryOverallocate, disk, diskOverallocate, uploadSize, daemonListen, daemonSftp, daemonBase, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        locationId:
+          type: integer
+        fqdn:
+          type: string
+        scheme:
+          type: string
+        behindProxy:
+          type: boolean
+        maintenanceMode:
+          type: boolean
+        memory:
+          type: integer
+        memoryOverallocate:
+          type: integer
+        disk:
+          type: integer
+        diskOverallocate:
+          type: integer
+        uploadSize:
+          type: integer
+        daemonListen:
+          type: integer
+        daemonSftp:
+          type: integer
+        daemonBase:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ─── Users ────────────────────────────────────────────────────────────────
+
+    PteroUser:
+      type: object
+      required: [id, externalId, uuid, username, email, firstName, lastName, language, rootAdmin, twoFactor, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        externalId:
+          type: ["string", "null"]
+        uuid:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        language:
+          type: string
+        rootAdmin:
+          type: boolean
+        twoFactor:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PteroUserList:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PteroUser"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    PteroUserInput:
+      type: object
+      required: [email, username, firstName, lastName, password]
+      properties:
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        password:
+          type: string
+        rootAdmin:
+          type: boolean
+
+    PteroUserUpdate:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        password:
+          type: string
+        rootAdmin:
+          type: boolean
+
+    # ─── Shared ───────────────────────────────────────────────────────────────
+
+    PaginationMeta:
+      type: object
+      required: [total, count, perPage, currentPage, totalPages]
+      properties:
+        total:
+          type: integer
+        count:
+          type: integer
+        perPage:
+          type: integer
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
