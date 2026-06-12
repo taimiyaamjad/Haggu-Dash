@@ -116,6 +116,7 @@ function mapServer(s: any) {
     updatedAt: a.updated_at ?? new Date().toISOString(),
     createdAt: a.created_at ?? new Date().toISOString(),
     status: a.status ?? null,
+    userId: a.user ?? null,
   };
 }
 
@@ -176,9 +177,10 @@ function mapPagination(meta: any) {
   };
 }
 
-export async function listServers(page = 1, search?: string) {
+export async function listServers(page = 1, search?: string, userId?: number) {
   const params = new URLSearchParams({ page: String(page), per_page: "50" });
   if (search) params.set("filter[name]", search);
+  if (userId) params.set("filter[user_id]", String(userId));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await pteroRequest(`/servers?${params}`);
   return {
@@ -304,6 +306,143 @@ export async function getServerResources(identifier: string) {
       uptime: r.uptime ?? 0,
     },
   };
+}
+
+export async function listNestsWithEggs() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nestsData: any = await pteroRequest("/nests?per_page=100");
+  const nests = nestsData.data ?? [];
+
+  const result = await Promise.all(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nests.map(async (nest: any) => {
+      const na = nest.attributes;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const eggsData: any = await pteroRequest(
+          `/nests/${na.id}/eggs?per_page=100`
+        );
+        return {
+          id: na.id,
+          name: na.name,
+          description: na.description ?? null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          eggs: (eggsData.data ?? []).map((e: any) => {
+            const ea = e.attributes;
+            return {
+              id: ea.id,
+              name: ea.name,
+              dockerImage: ea.docker_image ?? "",
+              startup: ea.startup ?? "",
+            };
+          }),
+        };
+      } catch {
+        return { id: na.id, name: na.name, description: null, eggs: [] };
+      }
+    })
+  );
+
+  return result.filter((n) => n.eggs.length > 0);
+}
+
+export async function getEggDetails(nestId: number, eggId: number) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await pteroRequest(
+    `/nests/${nestId}/eggs/${eggId}?include=variables`
+  );
+  const ea = data.attributes;
+  const variables = ea.relationships?.variables?.data ?? [];
+  const environment: Record<string, string> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const v of variables) {
+    const va = v.attributes;
+    environment[va.env_variable] = va.default_value ?? "";
+  }
+  return {
+    id: ea.id,
+    name: ea.name,
+    dockerImage: ea.docker_image ?? "",
+    startup: ea.startup ?? "",
+    environment,
+  };
+}
+
+export async function findFreeAllocation(): Promise<{
+  nodeId: number;
+  allocationId: number;
+}> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodesData: any = await pteroRequest("/nodes?per_page=100");
+  const nodes = nodesData.data ?? [];
+
+  for (const node of nodes) {
+    const nodeId = node.attributes.id;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allocsData: any = await pteroRequest(
+        `/nodes/${nodeId}/allocations?per_page=100`
+      );
+      const allocs = allocsData.data ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const free = allocs.find((a: any) => !a.attributes.assigned);
+      if (free) {
+        return { nodeId, allocationId: free.attributes.id };
+      }
+    } catch {
+      continue;
+    }
+  }
+  throw new Error(
+    "No free allocations found. Ask your admin to add more ports to a node."
+  );
+}
+
+export async function createPteroServer(params: {
+  name: string;
+  pterodactylUserId: number;
+  nestId: number;
+  eggId: number;
+  memory?: number;
+  cpu?: number;
+  disk?: number;
+}) {
+  const { memory = 2048, cpu = 50, disk = 10240 } = params;
+
+  const [egg, allocation] = await Promise.all([
+    getEggDetails(params.nestId, params.eggId),
+    findFreeAllocation(),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await pteroRequest("/servers", {
+    method: "POST",
+    body: JSON.stringify({
+      name: params.name,
+      user: params.pterodactylUserId,
+      egg: params.eggId,
+      docker_image: egg.dockerImage,
+      startup: egg.startup,
+      environment: egg.environment,
+      limits: {
+        memory,
+        swap: 0,
+        disk,
+        io: 500,
+        cpu,
+        threads: null,
+      },
+      feature_limits: {
+        databases: 0,
+        backups: 0,
+        allocations: 1,
+      },
+      allocation: {
+        default: allocation.allocationId,
+      },
+    }),
+  });
+  return mapServer(data);
 }
 
 export { mapServer, mapNode, mapUser };

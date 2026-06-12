@@ -7,8 +7,8 @@ import {
   getServerResources,
   getPteroConfig,
 } from "../lib/pterodactyl";
-import { db } from "@workspace/db";
-import { activityTable } from "@workspace/db";
+import { db, localUsersTable, activityTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   ListServersQueryParams,
   GetServerParams,
@@ -37,14 +37,43 @@ async function logActivity(
 }
 
 router.get("/servers", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const config = await getPteroConfig();
   if (!config) {
     res.status(503).json({ error: "Pterodactyl not configured. Visit Settings to add your API key." });
     return;
   }
+
   const parsed = ListServersQueryParams.safeParse(req.query);
   const page = parsed.success ? (parsed.data.page ?? 1) : 1;
   const search = parsed.success ? parsed.data.search : undefined;
+
+  const isAdmin = req.user?.role === "admin";
+
+  if (!isAdmin) {
+    const userId = parseInt(req.user!.id);
+    const [localUser] = await db
+      .select()
+      .from(localUsersTable)
+      .where(eq(localUsersTable.id, userId));
+    const pterodactylUserId = localUser?.pterodactylUserId;
+    if (!pterodactylUserId) {
+      res.json({ data: [], meta: { total: 0, count: 0, perPage: 50, currentPage: 1, totalPages: 1 } });
+      return;
+    }
+    try {
+      const result = await listServers(page, search ?? undefined, pterodactylUserId);
+      res.json(result);
+    } catch (err) {
+      req.log.error({ err }, "Failed to list user servers");
+      res.status(500).json({ error: "Failed to list servers" });
+    }
+    return;
+  }
+
   try {
     const result = await listServers(page, search ?? undefined);
     res.json(result);
@@ -55,6 +84,10 @@ router.get("/servers", async (req, res): Promise<void> => {
 });
 
 router.get("/servers/:serverId", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetServerParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid server ID" });
@@ -62,6 +95,15 @@ router.get("/servers/:serverId", async (req, res): Promise<void> => {
   }
   try {
     const server = await getServer(parsed.data.serverId);
+    const isAdmin = req.user?.role === "admin";
+    if (!isAdmin) {
+      const userId = parseInt(req.user!.id);
+      const [localUser] = await db.select().from(localUsersTable).where(eq(localUsersTable.id, userId));
+      if (server.userId !== localUser?.pterodactylUserId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+    }
     res.json(server);
   } catch (err) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,6 +117,10 @@ router.get("/servers/:serverId", async (req, res): Promise<void> => {
 });
 
 router.post("/servers/:serverId/power", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const paramsParsed = SendServerPowerActionParams.safeParse(req.params);
   const bodyParsed = SendServerPowerActionBody.safeParse(req.body);
   if (!paramsParsed.success || !bodyParsed.success) {
@@ -88,7 +134,7 @@ router.post("/servers/:serverId/power", async (req, res): Promise<void> => {
     await logActivity(
       "power",
       `Power action "${signal}" sent to server ${serverId}`,
-      { serverId }
+      { serverId, userId: req.user?.id, userName: req.user?.username }
     ).catch(() => {});
     res.status(204).end();
   } catch (err) {
@@ -103,6 +149,10 @@ router.post("/servers/:serverId/power", async (req, res): Promise<void> => {
 });
 
 router.post("/servers/:serverId/command", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const paramsParsed = SendServerCommandParams.safeParse(req.params);
   const bodyParsed = SendServerCommandBody.safeParse(req.body);
   if (!paramsParsed.success || !bodyParsed.success) {
@@ -116,7 +166,7 @@ router.post("/servers/:serverId/command", async (req, res): Promise<void> => {
     await logActivity(
       "command",
       `Command sent to server ${serverId}: ${command.slice(0, 80)}`,
-      { serverId }
+      { serverId, userId: req.user?.id, userName: req.user?.username }
     ).catch(() => {});
     res.status(204).end();
   } catch (err) {
@@ -131,6 +181,10 @@ router.post("/servers/:serverId/command", async (req, res): Promise<void> => {
 });
 
 router.get("/servers/:serverId/resources", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetServerResourcesParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid server ID" });

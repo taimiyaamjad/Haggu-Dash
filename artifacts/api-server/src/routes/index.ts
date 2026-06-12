@@ -7,6 +7,8 @@ import serversRouter from "./servers";
 import nodesRouter from "./nodes";
 import usersRouter from "./users";
 import activityRouter from "./activity";
+import eggsRouter from "./eggs";
+import userServersRouter from "./user-servers";
 
 const router: IRouter = Router();
 
@@ -18,5 +20,7 @@ router.use(serversRouter);
 router.use(nodesRouter);
 router.use(usersRouter);
 router.use(activityRouter);
+router.use(eggsRouter);
+router.use(userServersRouter);
 
 export default router;

@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,21 +16,35 @@ import Login from "@/pages/login";
 
 const queryClient = new QueryClient();
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center text-primary font-mono text-sm">
+      LOADING_SESSION...
+    </div>
+  );
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!isAuthenticated) return <Login />;
+  return (
+    <AppLayout>
+      <Component />
+    </AppLayout>
+  );
+}
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-primary font-mono text-sm">
-        LOADING_SESSION...
-      </div>
-    );
+function AdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const [, navigate] = useLocation();
+
+  if (isLoading) return <LoadingScreen />;
+  if (!isAuthenticated) return <Login />;
+  if (user?.role !== "admin") {
+    navigate("/");
+    return null;
   }
-
-  if (!isAuthenticated) {
-    return <Login />;
-  }
-
   return (
     <AppLayout>
       <Component />
@@ -44,8 +58,8 @@ function Router() {
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/servers" component={() => <ProtectedRoute component={Servers} />} />
       <Route path="/servers/:id" component={() => <ProtectedRoute component={ServerDetail} />} />
-      <Route path="/nodes" component={() => <ProtectedRoute component={Nodes} />} />
-      <Route path="/users" component={() => <ProtectedRoute component={Users} />} />
+      <Route path="/nodes" component={() => <AdminRoute component={Nodes} />} />
+      <Route path="/users" component={() => <AdminRoute component={Users} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
       <Route path="/login" component={Login} />
       <Route component={NotFound} />

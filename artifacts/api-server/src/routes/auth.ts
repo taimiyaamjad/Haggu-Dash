@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { db, localUsersTable } from "@workspace/db";
-import { eq, or } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import {
   clearSession,
   getSessionId,
@@ -45,7 +45,10 @@ router.post("/auth/login", async (req: Request, res: Response) => {
   const apiKey = await getSetting("apiKey");
   const isPterodactylConfigured = !!(panelUrl && apiKey);
 
-  if (!isPterodactylConfigured) {
+  const [countRow] = await db.select({ count: sql<number>`count(*)::int` }).from(localUsersTable);
+  const hasLocalUsers = (countRow?.count ?? 0) > 0;
+
+  if (!isPterodactylConfigured || !hasLocalUsers) {
     if (email === BOOTSTRAP_USER && password === BOOTSTRAP_PASS) {
       const sessionData: SessionData = {
         user: {
@@ -62,8 +65,10 @@ router.post("/auth/login", async (req: Request, res: Response) => {
       res.json(sessionData.user);
       return;
     }
-    res.status(401).json({ error: "Invalid credentials" });
-    return;
+    if (!isPterodactylConfigured) {
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
   }
 
   const [localUser] = await db
@@ -149,6 +154,9 @@ router.post("/auth/register", async (req: Request, res: Response) => {
     return;
   }
 
+  const [existingCount] = await db.select({ count: sql<number>`count(*)::int` }).from(localUsersTable);
+  const isFirstUser = (existingCount?.count ?? 0) === 0;
+
   const passwordHash = await bcrypt.hash(password, 12);
   const [newUser] = await db
     .insert(localUsersTable)
@@ -158,7 +166,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
       passwordHash,
       firstName,
       lastName,
-      role: "user",
+      role: isFirstUser ? "admin" : "user",
       pterodactylUserId,
     })
     .returning();
