@@ -1,4 +1,4 @@
-name/haggu-dHaggu Dash
+# Haggu Dash
 
 > A dark, data-forward self-hosted management dashboard for [Pterodactyl Panel](https://pterodactyl.io). Control your game servers, nodes, and users from one beautiful command-center interface.
 
