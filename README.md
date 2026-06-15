@@ -1,4 +1,4 @@
-# Haggu Dash
+name/haggu-dHaggu Dash
 
 > A dark, data-forward self-hosted management dashboard for [Pterodactyl Panel](https://pterodactyl.io). Control your game servers, nodes, and users from one beautiful command-center interface.
 
@@ -115,7 +115,7 @@ haggu-dash/
 ### Step 1 — Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/haggu-dash.git /opt/haggu-dash
+git clone https://github.com/taimiyaamjad/haggu-dash.git /opt/haggu-dash
 cd /opt/haggu-dash
 ```
 
