@@ -83,7 +83,7 @@ export default function Login() {
             <div className="w-14 h-14 bg-[#111] rounded-2xl flex items-center justify-center mb-4 border border-[#222] shadow-[0_0_15px_rgba(0,255,0,0.1)]">
               <Terminal className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold font-mono tracking-tight text-white mb-1">ZenDash</h1>
+            <h1 className="text-2xl font-bold font-mono tracking-tight text-white mb-1">Haggu Dash</h1>
             <p className="text-[#666] font-mono text-xs">Pterodactyl Control Panel</p>
           </div>
 

@@ -72,7 +72,7 @@ export default function Settings() {
       <Card className="bg-card border-border shadow-none">
         <CardHeader>
           <CardTitle className="font-mono">Pterodactyl Connection</CardTitle>
-          <CardDescription>Connect ZenDash to your Pterodactyl application API.</CardDescription>
+          <CardDescription>Connect Haggu Dash to your Pterodactyl application API.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">

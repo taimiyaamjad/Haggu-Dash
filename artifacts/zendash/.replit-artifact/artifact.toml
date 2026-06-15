@@ -1,31 +1,32 @@
 kind = "web"
-previewPath = "/"
-title = "ZenDash"
-version = "1.0.0"
-id = "artifacts/zendash"
-router = "path"
+  previewPath = "/"
+  title = "Haggu Dash"
+  version = "1.0.0"
+  id = "artifacts/zendash"
+  router = "path"
 
-[[integratedSkills]]
-name = "react-vite"
-version = "1.0.0"
+  [[integratedSkills]]
+  name = "react-vite"
+  version = "1.0.0"
 
-[[services]]
-name = "web"
-paths = [ "/" ]
-localPort = 25882
+  [[services]]
+  name = "web"
+  paths = [ "/" ]
+  localPort = 25882
 
-[services.development]
-run = "pnpm --filter @workspace/zendash run dev"
+  [services.development]
+  run = "pnpm --filter @workspace/zendash run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/zendash", "run", "build" ]
-publicDir = "artifacts/zendash/dist/public"
-serve = "static"
+  [services.production]
+  build = [ "pnpm", "--filter", "@workspace/zendash", "run", "build" ]
+  publicDir = "artifacts/zendash/dist/public"
+  serve = "static"
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/*"
+  to = "/index.html"
 
-[services.env]
-PORT = "25882"
-BASE_PATH = "/"
+  [services.env]
+  PORT = "25882"
+  BASE_PATH = "/"
+  

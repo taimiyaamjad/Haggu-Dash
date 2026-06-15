@@ -1,4 +1,4 @@
-# ZenDash
+# Haggu Dash
 
 A sleek, self-hosted server management dashboard for Pterodactyl Panel. Manage game servers, nodes, and users from one dark, data-forward command center.
 

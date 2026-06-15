@@ -61,7 +61,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <aside className="w-64 border-r border-border bg-card flex flex-col">
           <div className="h-16 flex items-center px-6 border-b border-border">
             <Terminal className="w-6 h-6 text-primary mr-3" />
-            <span className="font-bold text-lg tracking-tight font-mono">ZenDash</span>
+            <span className="font-bold text-lg tracking-tight font-mono">Haggu Dash</span>
             {isAdmin && (
               <span className="ml-auto">
                 <Shield className="w-4 h-4 text-primary" />
